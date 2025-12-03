@@ -1,0 +1,338 @@
+openapi: 3.0.0
+info:
+  title: Back Asignaciones API (External)
+  version: 1.0.0
+  description: API pública limitada para consultas externas
+servers:
+  - url: http://localhost:4041
+    description: Servidor de desarrollo
+security:
+  - bearerAuth: []
+tags:
+  - name: Assignments
+    description: Operaciones relacionadas con asignaciones
+  - name: Companies
+    description: Operaciones relacionadas con empresas
+  - name: Rules
+    description: Operaciones relacionadas con reglas
+  - name: Users
+    description: Operaciones relacionadas con usuarios
+paths:
+  # ASSIGNMENTS ENDPOINTS
+  /api/assignments/company/{companyId}/reassignment:
+    post:
+      tags: [Assignments]
+      summary: Reasignar asignaciones de una compañía
+      description: 'Reasigna las asignaciones de una compañía específica. REQUIERE: Token JWT en el header Authorization.'
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 900123456
+      responses:
+        '200':
+          description: Operación exitosa
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/assignments/company/{documentNumberCompany}:
+    get:
+      tags: [Assignments]
+      summary: Consultar asignaciones por documento de compañía
+      description: 'Consulta las asignaciones asociadas a una compañía específica. REQUIERE: Token JWT en el header Authorization.'
+      parameters:
+        - name: documentNumberCompany
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "900123456"
+      responses:
+        '200':
+          description: Lista de asignaciones
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/assignments/company/{company}:
+    get:
+      tags: [Assignments]
+      summary: Consultar asignaciones por nombre de compañía
+      parameters:
+        - name: company
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "Innovación Digital S.A.S."
+      responses:
+        '200':
+          description: Lista de asignaciones
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+
+  # COMPANIES ENDPOINTS
+  /api/companies/document/NIT/{companyDoc}:
+    get:
+      tags: [Companies]
+      summary: Consultar empresa por NIT
+      parameters:
+        - name: companyDoc
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "900123456"
+      responses:
+        '200':
+          description: Empresa encontrada
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/companies/by-document/{documentCompanyNumber}/roles/active:
+    get:
+      tags: [Companies]
+      summary: Consultar roles activos por documento de empresa
+      parameters:
+        - name: documentCompanyNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "900123456"
+      responses:
+        '200':
+          description: Lista de roles activos
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/companies/{companyId}/roles/active:
+    get:
+      tags: [Companies]
+      summary: Consultar roles activos por ID de empresa
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Lista de roles activos
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/companies/{companyId}/roles:
+    get:
+      tags: [Companies]
+      summary: Consultar todos los roles por ID de empresa
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Lista de roles
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/companies/{companyId}/rules:
+    get:
+      tags: [Companies]
+      summary: Consultar reglas por ID de empresa
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Lista de reglas
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/companies/import-users/{documentType}/{documentNumber}:
+    post:
+      tags: [Companies]
+      summary: Importar usuarios desde API externa
+      description: 'Importa usuarios desde API externa. NO REQUIERE autenticación JWT.'
+      security: []  # Override global security - no authentication required
+      parameters:
+        - name: documentType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [NIT, CC, CE]
+          example: "NIT"
+          description: Tipo de documento de la empresa
+        - name: documentNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "900123456"
+          description: Número de documento de la empresa
+      responses:
+        '200':
+          description: Usuarios importados exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Importación completada: 5 usuarios creados, 2 ya existían"
+                  data:
+                    type: object
+                    properties:
+                      created:
+                        type: integer
+                        example: 5
+                        description: Número de usuarios nuevos creados
+                      existing:
+                        type: integer
+                        example: 2
+                        description: Número de usuarios que ya existían
+                      company:
+                        type: string
+                        example: "Empresa Demo S.A.S."
+                        description: Nombre de la empresa
+                      totalProcessed:
+                        type: integer
+                        example: 7
+                        description: Total de usuarios procesados
+        '404':
+          description: Empresa no encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Empresa no encontrada en el API externo"
+                  data:
+                    type: null
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Error interno del servidor durante la importación"
+                  data:
+                    type: null
+
+  # RULES ENDPOINTS
+  /api/rules/with-roles:
+    get:
+      tags: [Rules]
+      summary: Consultar reglas con roles asociados
+      responses:
+        '200':
+          description: Lista de reglas con roles
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/rules/{ruleId}/roles:
+    get:
+      tags: [Rules]
+      summary: Consultar roles asociados a una regla
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Lista de roles asociados
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+
+  # USERS ENDPOINTS
+  /api/users/by-company-document/{companyDocumentNumber}:
+    get:
+      tags: [Users]
+      summary: Consultar usuarios por documento de empresa
+      description: 'Consulta los usuarios asociados a una empresa específica. REQUIERE: Token JWT en el header Authorization.'
+      parameters:
+        - name: companyDocumentNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "900123456"
+      responses:
+        '200':
+          description: Lista de usuarios
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Consultar usuario por ID
+      description: 'Consulta un usuario específico por su ID. REQUIERE: Token JWT en el header Authorization.'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Usuario encontrado
+        '304':
+          description: Sin contenido
+        '500':
+          description: Error del servidor
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT token obtenido del endpoint de login. Formato: Bearer {token}"
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: "API Key para autenticación"
