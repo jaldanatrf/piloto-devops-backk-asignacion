@@ -64,12 +64,13 @@ const {
 
 
 class Server {
-  constructor() {
+  constructor(options = {}) {
     this.app = express();
-    this.port = config.port;
+    this.port = options.port !== undefined ? options.port : config.port;
     this.databaseService = null;
     this.controllers = null;
     this.jwtService = null;
+    this.httpServer = null;
 
     this.setupMiddleware();
   }
@@ -357,26 +358,51 @@ class Server {
       // Initialize auto assignment bootstrap
       await this.initializeAutoAssignments();
 
-      // Start server
-      this.app.listen(this.port, () => {
-        console.log(`🚀 Server running on port ${this.port}`);
-        console.log(`📋 Internal Swagger: http://localhost:${this.port}/api-docs/internal`);
-        console.log(`🌐 External Swagger: http://localhost:${this.port}/api-docs/external`);
+      // Start server and store reference
+      return new Promise((resolve, reject) => {
+        this.httpServer = this.app.listen(this.port, () => {
+          // Get actual assigned port (useful when port is 0)
+          this.port = this.httpServer.address().port;
+
+          console.log(`🚀 Server running on port ${this.port}`);
+          console.log(`📋 Internal Swagger: http://localhost:${this.port}/api-docs/internal`);
+          console.log(`🌐 External Swagger: http://localhost:${this.port}/api-docs/external`);
+
+          resolve(this.port);
+        });
+
+        this.httpServer.on('error', (error) => {
+          console.error('Error starting server:', error);
+          logger.error('Failed to start server:', error);
+          reject(error);
+        });
       });
     } catch (error) {
       console.error('Error in start() method:', error);
       logger.error('Failed to start server:', error);
-      process.exit(1);
+      throw error;
     }
   }
 
   async shutdown() {
     try {
+      // Close HTTP server first
+      if (this.httpServer) {
+        await new Promise((resolve) => {
+          this.httpServer.close(() => {
+            logger.info('HTTP server closed');
+            resolve();
+          });
+        });
+      }
+
+      // Then close database connection
       if (this.databaseService) {
         await this.databaseService.shutdown();
       }
     } catch (error) {
       logger.error('Error during server shutdown:', error);
+      throw error;
     }
   }
 }

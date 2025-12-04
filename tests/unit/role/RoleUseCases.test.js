@@ -4,7 +4,7 @@ const {
   GetAllRolesUseCase,
   UpdateRoleUseCase,
   DeleteRoleUseCase
-} = require('../../../src/application/useCases/RoleUseCases');
+} = require('../../../src/application/useCases/roles/RoleUseCases');
 
 const { ValidationError, NotFoundError, ConflictError } = require('../../../src/shared/errors');
 

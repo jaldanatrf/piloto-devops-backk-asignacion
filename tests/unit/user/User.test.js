@@ -1,4 +1,4 @@
-const User = require('../src/domain/entities/users');
+const User = require('../../../src/domain/entities/users');
 
 describe('User Entity', () => {
   test('should create a valid user', () => {

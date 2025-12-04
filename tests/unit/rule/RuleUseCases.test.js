@@ -7,7 +7,7 @@ const {
   GetRulesByTypeUseCase,
   GetAvailableTypesUseCase,
   GetRuleStatsByTypeUseCase
-} = require('../../../src/application/useCases/CreateRuleUseCase');
+} = require('../../../src/application/useCases/rules/RuleUseCase');
 
 const { ValidationError, NotFoundError, ConflictError } = require('../../../src/shared/errors');
 

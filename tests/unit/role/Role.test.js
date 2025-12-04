@@ -1,4 +1,4 @@
-const Role = require('../src/domain/entities/Role');
+const Role = require('../../../src/domain/entities/Role');
 
 describe('Role Entity', () => {
   test('should create a valid role', () => {

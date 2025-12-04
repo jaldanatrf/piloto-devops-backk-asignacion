@@ -130,6 +130,7 @@ describe('ConfigurationUseCases', () => {
   describe('getConfigurationByCompanyId', () => {
     test('should get configuration by company id successfully', async () => {
       const mockConfig = new Configuration({ ...validConfigData, id: 1 });
+      mockCompanyRepository.findById.mockResolvedValue(mockCompany);
       mockConfigurationRepository.findByCompanyId.mockResolvedValue(mockConfig);
 
       const result = await configurationUseCases.getConfigurationByCompanyId(1);
@@ -140,6 +141,7 @@ describe('ConfigurationUseCases', () => {
     });
 
     test('should throw error if configuration not found for company', async () => {
+      mockCompanyRepository.findById.mockResolvedValue(mockCompany);
       mockConfigurationRepository.findByCompanyId.mockResolvedValue(null);
 
       await expect(
@@ -289,8 +291,8 @@ describe('ConfigurationUseCases', () => {
       expect(documentation).toHaveProperty('from_user');
       expect(documentation).toHaveProperty('from_company');
       expect(documentation).toHaveProperty('examples');
-      expect(documentation.from_assignment).toHaveProperty('assignment.id');
-      expect(documentation.from_user).toHaveProperty('user.dud');
+      expect(documentation.from_assignment).toHaveProperty(['assignment.id']);
+      expect(documentation.from_user).toHaveProperty(['user.dud']);
     });
   });
 });

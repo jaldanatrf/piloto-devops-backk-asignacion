@@ -13,7 +13,7 @@ const DatabaseFactory = require('../src/infrastructure/factories/DatabaseFactory
     console.log('   NIT:', company.documentNumber);
 
     // Buscar TODAS las reglas sin importar si están activas
-    const sequelize = db.getSequelizeInstance();
+    const sequelize = db.databaseAdapter.getSequelizeInstance();
     const [rules] = await sequelize.query(`
       SELECT
         id,

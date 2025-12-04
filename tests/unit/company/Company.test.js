@@ -1,4 +1,4 @@
-const Company = require('../src/domain/entities/company');
+const Company = require('../../../src/domain/entities/Company');
 
 describe('Company Entity', () => {
   test('should create a valid company', () => {

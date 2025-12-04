@@ -1,9 +1,7 @@
 const axios = require('axios');
 const Server = require('../../../src/infrastructure/web/server');
-const authHelper = require('../../helpers/authHelper');
 
 describe('Company Endpoints Integration Tests', () => {
-  let authToken;
   let server;
   let baseURL;
   let createdCompanyId = null;
@@ -12,9 +10,6 @@ describe('Company Endpoints Integration Tests', () => {
     // Start server with dynamic port
     server = new Server({ port: 0 });
     const port = await server.start();
-
-    // Generar token de autenticación para tests
-    authToken = authHelper.generateAdminToken();
     baseURL = `http://localhost:${port}/api`;
   });
 
@@ -28,10 +23,7 @@ describe('Company Endpoints Integration Tests', () => {
     // Clean up: delete created company if exists
     if (createdCompanyId) {
       try {
-        await axios.delete(
-          `${baseURL}/companies/${createdCompanyId}`,
-          { headers: { 'Authorization': `Bearer ${authToken}` } }
-        );
+        await axios.delete(`${baseURL}/companies/${createdCompanyId}`);
         createdCompanyId = null;
       } catch (error) {
         // Ignore cleanup errors
@@ -46,22 +38,17 @@ describe('Company Endpoints Integration Tests', () => {
         name: `Test Company ${timestamp}`,
         description: 'Integration test company',
         documentNumber: `${timestamp}`,
-        documentType: 'NIT',
-        type: 'PROVIDER'
+        documentType: 'NIT'
       };
 
-      const response = await axios.post(
-        `${baseURL}/companies`,
-        companyData,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
-      );
-
+      const response = await axios.post(`${baseURL}/companies`, companyData);
+      
       expect(response.status).toBe(201);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty('id');
       expect(response.data.data.name).toBe(companyData.name);
       expect(response.data.data.documentType).toBe('NIT');
-
+      
       createdCompanyId = response.data.data.id;
     });
 
@@ -69,17 +56,12 @@ describe('Company Endpoints Integration Tests', () => {
       const companyData = {
         name: 'Test Company Without DocType',
         description: 'Test company',
-        documentNumber: '123456789',
-        type: 'PROVIDER'
+        documentNumber: '123456789'
         // documentType is missing
       };
 
       try {
-        await axios.post(
-          `${baseURL}/companies`,
-          companyData,
-          { headers: { 'Authorization': `Bearer ${authToken}` } }
-        );
+        await axios.post(`${baseURL}/companies`, companyData);
         fail('Should have thrown an error');
       } catch (error) {
         expect(error.response.status).toBe(400);
@@ -93,16 +75,11 @@ describe('Company Endpoints Integration Tests', () => {
         name: `Duplicate Company ${timestamp}`,
         description: 'First company',
         documentNumber: `${timestamp}`,
-        documentType: 'NIT',
-        type: 'PROVIDER'
+        documentType: 'NIT'
       };
 
       // Create first company
-      const firstResponse = await axios.post(
-        `${baseURL}/companies`,
-        companyData,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
-      );
+      const firstResponse = await axios.post(`${baseURL}/companies`, companyData);
       createdCompanyId = firstResponse.data.data.id;
 
       // Try to create duplicate
@@ -112,11 +89,7 @@ describe('Company Endpoints Integration Tests', () => {
       };
 
       try {
-        await axios.post(
-          `${baseURL}/companies`,
-          duplicateData,
-          { headers: { 'Authorization': `Bearer ${authToken}` } }
-        );
+        await axios.post(`${baseURL}/companies`, duplicateData);
         fail('Should have thrown an error for duplicate name');
       } catch (error) {
         expect(error.response.status).toBe(409);
@@ -132,22 +105,16 @@ describe('Company Endpoints Integration Tests', () => {
         name: `Search Test Company ${timestamp}`,
         description: 'Company for search test',
         documentNumber: `${timestamp}`,
-        documentType: 'NIT',
-        type: 'PROVIDER'
+        documentType: 'NIT'
       };
 
       // Create company
-      const createResponse = await axios.post(
-        `${baseURL}/companies`,
-        companyData,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
-      );
+      const createResponse = await axios.post(`${baseURL}/companies`, companyData);
       createdCompanyId = createResponse.data.data.id;
 
       // Search by document type and number
       const searchResponse = await axios.get(
-        `${baseURL}/companies/document/${companyData.documentType}/${companyData.documentNumber}`,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
+        `${baseURL}/companies/document/${companyData.documentType}/${companyData.documentNumber}`
       );
 
       expect(searchResponse.status).toBe(200);
@@ -159,10 +126,7 @@ describe('Company Endpoints Integration Tests', () => {
 
     it('should return 404 for non-existent document', async () => {
       try {
-        await axios.get(
-          `${baseURL}/companies/document/NIT/999999999`,
-          { headers: { 'Authorization': `Bearer ${authToken}` } }
-        );
+        await axios.get(`${baseURL}/companies/document/NIT/999999999`);
         fail('Should have thrown an error');
       } catch (error) {
         expect(error.response.status).toBe(404);
@@ -173,22 +137,16 @@ describe('Company Endpoints Integration Tests', () => {
 
   describe('GET /api/companies', () => {
     it('should list all companies', async () => {
-      const response = await axios.get(
-        `${baseURL}/companies`,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
-      );
-
+      const response = await axios.get(`${baseURL}/companies`);
+      
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(Array.isArray(response.data.data)).toBe(true);
     });
 
     it('should filter active companies', async () => {
-      const response = await axios.get(
-        `${baseURL}/companies/active`,
-        { headers: { 'Authorization': `Bearer ${authToken}` } }
-      );
-
+      const response = await axios.get(`${baseURL}/companies/active`);
+      
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(Array.isArray(response.data.data)).toBe(true);

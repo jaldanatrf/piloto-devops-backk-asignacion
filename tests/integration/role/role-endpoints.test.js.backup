@@ -18,15 +18,14 @@ describe('Role Endpoints Integration Tests', () => {
     // Generar token de autenticación para tests
     authToken = authHelper.generateAdminToken();
 
-    // Crear una empresa de prueba para los roles con timestamp único
-    const timestamp = Date.now();
+    // Crear una empresa de prueba para los roles
     const companyResponse = await request(app)
       .post('/api/companies')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        name: `Test Company for Roles ${timestamp}`,
+        name: 'Test Company for Roles',
         description: 'Company created for role testing',
-        documentNumber: `${timestamp}`,
+        documentNumber: '900555444',
         documentType: 'NIT',
         type: 'PAYER'
       });
@@ -73,7 +72,6 @@ describe('Role Endpoints Integration Tests', () => {
 
       const response = await request(app)
         .post(`/api/companies/${createdCompanyId}/roles`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(roleData);
 
       expect(response.status).toBe(400);
@@ -88,7 +86,6 @@ describe('Role Endpoints Integration Tests', () => {
 
       const response = await request(app)
         .post(`/api/companies/${createdCompanyId}/roles`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(roleData);
 
       expect(response.status).toBe(409);
@@ -103,7 +100,6 @@ describe('Role Endpoints Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/companies/99999/roles')
-        .set('Authorization', `Bearer ${authToken}`)
         .send(roleData);
 
       expect(response.status).toBe(400);
@@ -114,8 +110,7 @@ describe('Role Endpoints Integration Tests', () => {
   describe('GET /api/companies/:companyId/roles', () => {
     test('should get all roles for a company', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -126,13 +121,12 @@ describe('Role Endpoints Integration Tests', () => {
 
     test('should filter roles by active status', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles?isActive=true`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles?isActive=true`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(Array.isArray(response.body.data)).toBe(true);
-
+      
       // Verificar que todos los roles retornados están activos
       response.body.data.forEach(role => {
         expect(role.isActive).toBe(true);
@@ -141,8 +135,7 @@ describe('Role Endpoints Integration Tests', () => {
 
     test('should filter roles by name', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles?name=Admin`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles?name=Admin`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -153,13 +146,12 @@ describe('Role Endpoints Integration Tests', () => {
   describe('GET /api/companies/:companyId/roles/active', () => {
     test('should get only active roles', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/active`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/active`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(Array.isArray(response.body.data)).toBe(true);
-
+      
       // Verificar que todos los roles retornados están activos
       response.body.data.forEach(role => {
         expect(role.isActive).toBe(true);
@@ -170,8 +162,7 @@ describe('Role Endpoints Integration Tests', () => {
   describe('GET /api/companies/:companyId/roles/search', () => {
     test('should search roles by name', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/search?q=Admin`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/search?q=Admin`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -180,8 +171,7 @@ describe('Role Endpoints Integration Tests', () => {
 
     test('should fail search without query parameter', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/search`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/search`);
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
@@ -189,8 +179,7 @@ describe('Role Endpoints Integration Tests', () => {
 
     test('should limit search results', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/search?q=Admin&limit=1`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/search?q=Admin&limit=1`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -202,8 +191,7 @@ describe('Role Endpoints Integration Tests', () => {
   describe('GET /api/companies/:companyId/roles/:roleId', () => {
     test('should get a specific role by ID', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/${createdRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/${createdRoleId}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -214,22 +202,19 @@ describe('Role Endpoints Integration Tests', () => {
 
     test('should fail when getting non-existent role', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/99999`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/99999`);
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
     });
 
     test('should fail when getting role from wrong company', async () => {
-      // Crear otra empresa con timestamp único
-      const timestamp = Date.now();
+      // Crear otra empresa
       const anotherCompanyResponse = await request(app)
         .post('/api/companies')
-        .set('Authorization', `Bearer ${authToken}`)
         .send({
-          name: `Another Test Company ${timestamp}`,
-          documentNumber: `${timestamp + 1}`,
+          name: 'Another Test Company',
+          documentNumber: '900777888',
           documentType: 'NIT',
           type: 'PROVIDER'
         });
@@ -237,8 +222,7 @@ describe('Role Endpoints Integration Tests', () => {
       const anotherCompanyId = anotherCompanyResponse.body.data.id;
 
       const response = await request(app)
-        .get(`/api/companies/${anotherCompanyId}/roles/${createdRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${anotherCompanyId}/roles/${createdRoleId}`);
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
@@ -255,7 +239,6 @@ describe('Role Endpoints Integration Tests', () => {
 
       const response = await request(app)
         .put(`/api/companies/${createdCompanyId}/roles/${createdRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(updateData);
 
       expect(response.status).toBe(200);
@@ -269,7 +252,6 @@ describe('Role Endpoints Integration Tests', () => {
       // Crear otro rol
       const anotherRoleResponse = await request(app)
         .post(`/api/companies/${createdCompanyId}/roles`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Editor',
           description: 'Editor role'
@@ -280,7 +262,6 @@ describe('Role Endpoints Integration Tests', () => {
       // Intentar actualizar con nombre duplicado
       const response = await request(app)
         .put(`/api/companies/${createdCompanyId}/roles/${anotherRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Super Administrator' // Nombre que ya existe
         });
@@ -292,7 +273,6 @@ describe('Role Endpoints Integration Tests', () => {
     test('should fail when updating non-existent role', async () => {
       const response = await request(app)
         .put(`/api/companies/${createdCompanyId}/roles/99999`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Updated Role'
         });
@@ -307,7 +287,6 @@ describe('Role Endpoints Integration Tests', () => {
       // Crear un rol específico para eliminar
       const roleToDeleteResponse = await request(app)
         .post(`/api/companies/${createdCompanyId}/roles`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Temporary Role',
           description: 'Role to be deleted'
@@ -316,8 +295,7 @@ describe('Role Endpoints Integration Tests', () => {
       const roleToDeleteId = roleToDeleteResponse.body.data.id;
 
       const response = await request(app)
-        .delete(`/api/companies/${createdCompanyId}/roles/${roleToDeleteId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .delete(`/api/companies/${createdCompanyId}/roles/${roleToDeleteId}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -325,16 +303,14 @@ describe('Role Endpoints Integration Tests', () => {
 
       // Verificar que el rol realmente fue eliminado
       const getResponse = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/${roleToDeleteId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/${roleToDeleteId}`);
 
       expect(getResponse.status).toBe(404);
     });
 
     test('should fail when deleting non-existent role', async () => {
       const response = await request(app)
-        .delete(`/api/companies/${createdCompanyId}/roles/99999`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .delete(`/api/companies/${createdCompanyId}/roles/99999`);
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
@@ -344,16 +320,14 @@ describe('Role Endpoints Integration Tests', () => {
   describe('Error handling', () => {
     test('should handle invalid company ID format', async () => {
       const response = await request(app)
-        .get('/api/companies/invalid/roles')
-        .set('Authorization', `Bearer ${authToken}`);
+        .get('/api/companies/invalid/roles');
 
       expect(response.status).toBe(400);
     });
 
     test('should handle invalid role ID format', async () => {
       const response = await request(app)
-        .get(`/api/companies/${createdCompanyId}/roles/invalid`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .get(`/api/companies/${createdCompanyId}/roles/invalid`);
 
       expect(response.status).toBe(400);
     });

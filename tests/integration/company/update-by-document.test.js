@@ -1,4 +1,4 @@
-const { UpdateCompanyByDocumentUseCase } = require('../../../src/application/useCases/CompanyUseCases');
+const { UpdateCompanyByDocumentUseCase } = require('../../../src/application/useCases/company/UpdateCompanyByDocumentUseCase');
 
 describe('UpdateCompanyByDocumentUseCase', () => {
   let mockCompanyRepository;

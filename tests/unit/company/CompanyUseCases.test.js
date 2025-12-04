@@ -6,9 +6,9 @@ const {
   UpdateCompanyUseCase,
   DeleteCompanyUseCase,
   GetCompanyStatsUseCase
-} = require('../src/application/useCases/CompanyUseCases');
+} = require('../../../src/application/useCases/company/CompanyUseCases');
 
-const { ValidationError, NotFoundError, ConflictError } = require('../src/shared/errors');
+const { ValidationError, NotFoundError, ConflictError } = require('../../../src/shared/errors');
 
 // Mock del repositorio
 const mockCompanyRepository = {

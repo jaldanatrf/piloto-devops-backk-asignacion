@@ -2,11 +2,11 @@
  * Script para probar la priorización correcta de reglas
  *
  * Caso de prueba del usuario:
- * - Source: 901002487 (empresa que TIENE las reglas)
- * - Target: 860037950 (empresa destino)
+ * - Source: 860037950 (Fundación Santa Fe - empresa que TIENE las reglas)
+ * - Target: 901002487 (CTIC - empresa destino)
  * - ObjectionCode: abc123
  *
- * Reglas esperadas:
+ * Reglas configuradas en Source (860037950):
  * 1. COMPANY-CODE con NIT 860037950 y código abc123 → Debe aplicar (prioridad 2)
  * 2. CODE con código abc123 → Debe aplicar pero ser descartada por priorización (prioridad 6)
  *
@@ -35,13 +35,13 @@ async function testRulePrioritization() {
       repositories.roleRepository
     );
 
-    // Mensaje de prueba del usuario
+    // Mensaje de prueba del usuario (CORREGIDO)
     const claimMessage = {
       ProcessId: "LOTE-20251003163406-EDEBBF84",
-      Source: "901002487",          // Empresa que TIENE las reglas
-      Target: "860037950",           // Empresa destino
+      Source: "860037950",           // Empresa que TIENE las reglas (Fundación Santa Fe)
+      Target: "901002487",           // Empresa destino (CTIC)
       DocumentNumber: "901002487_20253152",
-      InvoiceAmount: 0,
+      InvoiceAmount: 1340,
       ExternalReference: "11",
       ClaimId: "901002487_20253152_11_GLO_TA02",
       ConceptApplicationCode: "GLO",
@@ -54,8 +54,8 @@ async function testRulePrioritization() {
     console.log('\n' + '═'.repeat(70));
 
     // Verificar reglas existentes para la empresa Source
-    console.log('\n🔍 Verificando reglas existentes para empresa Source (901002487)...\n');
-    const sourceCompany = await repositories.companyRepository.findByDocumentNumber('901002487');
+    console.log('\n🔍 Verificando reglas existentes para empresa Source (860037950)...\n');
+    const sourceCompany = await repositories.companyRepository.findByDocumentNumber('860037950');
     if (sourceCompany) {
       const allRules = await repositories.ruleRepository.findByCompany(sourceCompany.id);
       console.log(`📋 Total de reglas configuradas: ${allRules.length}`);
@@ -146,7 +146,7 @@ async function testRulePrioritization() {
     console.log('\n' + '═'.repeat(70));
 
     // Cerrar conexión
-    await databaseService.disconnect();
+    await databaseService.shutdown();
 
   } catch (error) {
     console.error('\n❌ Error en la prueba:', error.message);

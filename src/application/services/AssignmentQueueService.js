@@ -306,22 +306,22 @@ class AssignmentQueueService {
         return;
       }
 
-      // Obtener la empresa objetivo (Target) para usar su companyId en la asignación
-      // Target es quien tiene las reglas configuradas y quien debe procesar
-      const targetCompany = await this.businessRuleProcessorUseCases.findCompanyByDocumentNumber(claimData.Target);
+      // Obtener la empresa Source (quien tiene las reglas y debe procesar)
+      // Source es quien tiene las reglas configuradas, Target es solo criterio de evaluación
+      const sourceCompany = await this.businessRuleProcessorUseCases.findCompanyByDocumentNumber(claimData.Source);
 
-      if (!targetCompany) {
-        logger.warn("⚠️ Target company not found:", {
+      if (!sourceCompany) {
+        logger.warn("⚠️ Source company not found:", {
           claimId: claimData.ClaimId,
-          target: claimData.Target,
+          source: claimData.Source,
         });
         await logToDatabase(
           {
             level: "warn",
-            message: "Target company not found",
+            message: "Source company not found",
             meta: {
               claimId: claimData.ClaimId,
-              target: claimData.Target,
+              source: claimData.Source,
             },
             user: logUser,
             service: "AssignmentQueueService",
@@ -352,7 +352,7 @@ class AssignmentQueueService {
         };
         const assignmentData = {
           userId: null,
-          companyId: targetCompany.id, // Usar empresa objetivo (Target) que tiene las reglas
+          companyId: sourceCompany.id, // Empresa Source que tiene las reglas y procesa
           status: "pending",
           type: this.determineAssignmentType(claimData),
           dateAssignated: new Date(),
@@ -394,7 +394,7 @@ class AssignmentQueueService {
         const Assignment = require("../../domain/entities/assignment");
         const assignmentData = {
           userId: null,
-          companyId: targetCompany.id, // Usar empresa objetivo (Target) que tiene las reglas
+          companyId: sourceCompany.id, // Empresa Source que tiene las reglas y procesa
           status: "pending",
           type: this.determineAssignmentType(claimData),
           dateAssignated: new Date(),
@@ -413,17 +413,17 @@ class AssignmentQueueService {
         selectedUser,
         processResult,
         claimData,
-        targetCompany
+        sourceCompany
       );
 
       // Invocar servicio externo para notificar asignación usando configuración por empresa
       try {
-        // Obtener configuración de la empresa (targetCompany)
-        const configuration = await this.configurationRepository.findByCompanyId(targetCompany.id);
+        // Obtener configuración de la empresa Source (quien procesa la asignación)
+        const configuration = await this.configurationRepository.findByCompanyId(sourceCompany.id);
 
         if (!configuration) {
           logger.warn("⚠️ No configuration found for company, skipping notification", {
-            companyId: targetCompany.id,
+            companyId: sourceCompany.id,
             claimId: claimData.ClaimId,
           });
           await logToDatabase(
@@ -431,7 +431,7 @@ class AssignmentQueueService {
               level: "warn",
               message: "No configuration found for company, skipping notification",
               meta: {
-                companyId: targetCompany.id,
+                companyId: sourceCompany.id,
                 claimId: claimData.ClaimId,
               },
               user: logUser,
@@ -441,7 +441,7 @@ class AssignmentQueueService {
           );
         } else if (!configuration.isActive) {
           logger.warn("⚠️ Configuration is inactive, skipping notification", {
-            companyId: targetCompany.id,
+            companyId: sourceCompany.id,
             configurationId: configuration.id,
             claimId: claimData.ClaimId,
           });
@@ -450,7 +450,7 @@ class AssignmentQueueService {
               level: "warn",
               message: "Configuration is inactive, skipping notification",
               meta: {
-                companyId: targetCompany.id,
+                companyId: sourceCompany.id,
                 configurationId: configuration.id,
                 claimId: claimData.ClaimId,
               },
@@ -471,6 +471,7 @@ class AssignmentQueueService {
               id: assignment.id,
               processId: claimData.ProcessId,
               source: claimData.Source,
+              target: claimData.Target,
               documentNumber: claimData.DocumentNumber,
               documentType: claimData.DocumentType,
               claimId: claimData.ClaimId,
@@ -479,7 +480,7 @@ class AssignmentQueueService {
               objectionCode: claimData.ObjectionCode,
               conceptApplicationCode: claimData.ConceptApplicationCode,
               externalReference: claimData.ExternalReference,
-              companyId: targetCompany.id,
+              companyId: sourceCompany.id,
               userId: selectedUser.id,
             },
             user: {
@@ -489,11 +490,11 @@ class AssignmentQueueService {
               companyId: selectedUser.companyId,
             },
             company: {
-              id: targetCompany.id,
-              name: targetCompany.name,
-              documentNumber: targetCompany.documentNumber,
-              documentType: targetCompany.documentType,
-              type: targetCompany.type,
+              id: sourceCompany.id,
+              name: sourceCompany.name,
+              documentNumber: sourceCompany.documentNumber,
+              documentType: sourceCompany.documentType,
+              type: sourceCompany.type,
             },
           };
 
@@ -518,7 +519,7 @@ class AssignmentQueueService {
                 processId: claimData.ProcessId,
                 assignedUserId: selectedUser.id,
                 claimId: claimData.ClaimId,
-                companyId: targetCompany.id,
+                companyId: sourceCompany.id,
                 configurationId: configuration.id,
               },
               user: logUser,
@@ -658,10 +659,10 @@ class AssignmentQueueService {
    * @param {Object} selectedUser - Usuario seleccionado
    * @param {Object} processResult - Resultado del procesamiento de reglas
    * @param {Object} claimData - Datos originales de la reclamación
-   * @param {Object} targetCompany - Empresa objetivo (Target) que tiene las reglas
+   * @param {Object} sourceCompany - Empresa Source que tiene las reglas y procesa
    * @returns {Object} - Asignación creada
    */
-  async createAssignment(selectedUser, processResult, claimData, targetCompany) {
+  async createAssignment(selectedUser, processResult, claimData, sourceCompany) {
     try {
       const Assignment = require("../../domain/entities/assignment");
 
@@ -669,7 +670,7 @@ class AssignmentQueueService {
       const assignmentData = {
         userId: selectedUser.id,
         roleId: selectedUser.role?.id,
-        companyId: targetCompany.id, // Usar empresa objetivo (Target) que tiene las reglas
+        companyId: sourceCompany.id, // Empresa Source que tiene las reglas y procesa
         status: "assigned",
         assignedUserIdField: selectedUser.id,
         type: this.determineAssignmentType(claimData),
