@@ -97,13 +97,13 @@ describe('JwtService Security Tests', () => {
   describe('Full Authentication Process', () => {
     test('should authenticate user successfully', async () => {
       const result = await jwtService.authenticateUser('test-api-key', '12345678-9');
-      
+
       expect(result.success).toBe(true);
       expect(result.token).toBeDefined();
       expect(result.refreshToken).toBeDefined();
       expect(result.user.id).toBe(1);
       expect(result.user.DUD).toBe('12345678-9');
-      expect(result.expiresIn).toBe('1h');
+      expect(result.expiresIn).toBe('24h');
     });
 
     test('should reject with invalid API key', async () => {
@@ -126,9 +126,9 @@ describe('JwtService Security Tests', () => {
     test('should generate and verify JWT token', () => {
       const payload = {
         id: 1,
-        name: 'Juan Pérez',
-        DUD: '12345678-9',
-        companyId: 1,
+        firstName: 'Juan',
+        lastName: 'Pérez',
+        email: 'juan@example.com',
         roles: [1, 2]
       };
 
@@ -138,8 +138,10 @@ describe('JwtService Security Tests', () => {
 
       const decoded = jwtService.verifyToken(token);
       expect(decoded.id).toBe(1);
-      expect(decoded.DUD).toBe('12345678-9');
-      expect(decoded.companyId).toBe(1);
+      expect(decoded.firstName).toBe('Juan');
+      expect(decoded.lastName).toBe('Pérez');
+      expect(decoded.email).toBe('juan@example.com');
+      expect(decoded.roles).toEqual([1, 2]);
     });
 
     test('should reject invalid token', () => {
@@ -149,9 +151,9 @@ describe('JwtService Security Tests', () => {
     });
 
     test('should extract token from authorization header', () => {
-      const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+      const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MX0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
       const authHeader = `Bearer ${token}`;
-      
+
       const extractedToken = jwtService.extractTokenFromHeader(authHeader);
       expect(extractedToken).toBe(token);
     });

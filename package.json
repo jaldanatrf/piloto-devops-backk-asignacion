@@ -12,8 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:critical": "jest --testNamePattern=\"@critical\"",
-    "test:high": "jest --testNamePattern=\"@high\"",
+    "test:critical": "env-cmd -f .env.dev jest --testNamePattern=\"@critical\"",
+    "test:high": "env-cmd -f .env.dev jest --testNamePattern=\"@high\"",
     "test:medium": "jest --testNamePattern=\"@medium\"",
     "test:low": "jest --testNamePattern=\"@low\"",
     "test:priority": "npm run test:critical && npm run test:high",
@@ -54,6 +54,7 @@
   "license": "ISC",
   "dependencies": {
     "amqplib": "^0.10.8",
+    "js-yaml": "^4.1.0",
     "axios": "^1.11.0",
     "axios-retry": "^4.5.0",
     "bcryptjs": "^2.4.3",
@@ -67,12 +68,12 @@
     "sequelize": "^6.37.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "winston": "^3.10.0"
+    "winston": "^3.10.0",
+    "@types/jest": "^29.5.3",
+    "jest": "^29.6.2"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.3",
     "env-cmd": "^11.0.0",
-    "jest": "^29.6.2",
     "nodemon": "^3.1.10",
     "pm2": "^6.0.10",
     "supertest": "^6.3.3"

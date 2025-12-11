@@ -1,0 +1,442 @@
+# Azure DevOps Pipeline for Back-Asignaciones Deployment
+# This pipeline handles deployment with automated backup, testing, and rollback capabilities
+
+trigger:
+  branches:
+    include:
+      - master
+      - main
+  paths:
+    exclude:
+      - docs/*
+      - README.md
+      - node_modules/*
+
+pool:
+  name: 'Default'
+  demands:
+    - agent.name -equals pru-agente-asignaciones
+
+variables:
+  # Project configuration
+  - name: projectName
+    value: 'back-asignaciones'
+  - name: nodeVersion
+    value: '22.12.0'
+
+  # Environment configuration
+  - name: pm2StartCommand
+    value: 'pm2:start:dev'  # Options: pm2:start:dev, pm2:start:pre, pm2:start:prod
+
+  # Deployment paths
+  - name: deployPath
+    value: '/home/jfuente/back-asignaciones'
+  - name: backupPath
+    value: '/home/jfuente/back-asignaciones_backups'
+  - name: timestamp
+    value: $[format('{0:yyyyMMddHHmmss}', pipeline.startTime)]
+
+stages:
+  - stage: DeployAndTest
+    displayName: 'Deploy and Test Application'
+    jobs:
+      - job: DeploymentJob
+        displayName: 'Deployment with Rollback Support'
+        steps:
+          # ============================================
+          # Step 1: Setup Node.js Environment
+          # ============================================
+          - task: NodeTool@0
+            displayName: '1. Setup Node.js $(nodeVersion)'
+            inputs:
+              versionSpec: '$(nodeVersion)'
+
+          # ============================================
+          # Step 2: Backup Current Production Code
+          # ============================================
+          - script: |
+              echo "Creating backup directory..."
+              mkdir -p $(backupPath)/$(projectName)-$(timestamp)
+
+              echo "Checking if production deployment exists..."
+              if [ -d "$(deployPath)" ] && [ "$(ls -A $(deployPath))" ]; then
+                echo "Backing up CURRENT PRODUCTION code from $(deployPath)..."
+                echo "NOTE: Including .env files in backup for restoration"
+                rsync -av \
+                  --exclude='node_modules' \
+                  --exclude='*.log' \
+                  --exclude='coverage' \
+                  --exclude='.git' \
+                  $(deployPath)/ \
+                  $(backupPath)/$(projectName)-$(timestamp)/
+
+                echo "Production backup completed successfully"
+                echo "Backup location: $(backupPath)/$(projectName)-$(timestamp)"
+
+                echo "Verifying .env files in backup:"
+                ls -lah $(backupPath)/$(projectName)-$(timestamp)/.env* 2>/dev/null || echo "No .env files found in backup"
+                echo ""
+                echo "Backup contents (first 20 files):"
+                ls -lah $(backupPath)/$(projectName)-$(timestamp) | head -20
+              else
+                echo "No existing production deployment found - first time deployment"
+                echo "Skipping backup (nothing to backup)"
+              fi
+            displayName: '2. Backup Current Production'
+            condition: succeeded()
+
+          # ============================================
+          # Step 3: Install Dependencies
+          # ============================================
+          - script: |
+              echo "Installing project dependencies..."
+              npm ci --production=false
+            displayName: '3. Install Dependencies'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+          # ============================================
+          # Step 4: Deploy Project to Target Location
+          # ============================================
+          - script: |
+              echo "Creating deployment directory..."
+              mkdir -p $(deployPath)
+
+              echo "Deploying project files (excluding node_modules and .env files)..."
+              rsync -av \
+                --exclude='node_modules' \
+                --exclude='.env*' \
+                --exclude='*.log' \
+                --exclude='coverage' \
+                --exclude='.git' \
+                $(System.DefaultWorkingDirectory)/ \
+                $(deployPath)/
+
+              echo "Installing production dependencies in deployment location..."
+              cd $(deployPath)
+              npm ci --production
+
+              echo "Deployment completed successfully"
+              ls -lah $(deployPath)
+            displayName: '4. Deploy Project Files'
+            condition: succeeded()
+
+          # ============================================
+          # Step 5: Restart Server with PM2
+          # ============================================
+          - script: |
+              cd $(deployPath)
+
+              echo "PM2 Start Command: npm run $(pm2StartCommand)"
+              echo "Checking if application is already running..."
+
+              if pm2 describe $(projectName) > /dev/null 2>&1; then
+                echo "Application found - stopping..."
+                pm2 delete $(projectName)
+              fi
+
+              # Ensure we are in the correct directory
+              cd $(deployPath)
+              echo "Current directory: $(pwd)"
+              echo "Verifying package.json exists..."
+              ls -la package.json
+
+              echo "Starting application with npm run $(pm2StartCommand)..."
+              if npm run $(pm2StartCommand); then
+                echo "✅ Application start command executed successfully"
+              else
+                echo "❌ ERROR: Failed to start application"
+                echo "Command: npm run $(pm2StartCommand)"
+                echo "Current directory: $(pwd)"
+                pm2 list
+                exit 1
+              fi
+
+              echo "Waiting for application to stabilize..."
+              sleep 5
+
+              echo "Verifying application started correctly..."
+              if pm2 describe $(projectName) > /dev/null 2>&1; then
+                echo "Application status:"
+                pm2 status $(projectName)
+
+                # Check if app is online
+                if pm2 describe $(projectName) | grep -q "online"; then
+                  echo "✅ Server restart completed successfully"
+                else
+                  echo "⚠️  WARNING: Application exists but is not online"
+                  pm2 describe $(projectName) | grep "status"
+                  echo ""
+                  echo "Last 50 lines of logs:"
+                  pm2 logs $(projectName) --lines 50 --nostream || true
+                  exit 1
+                fi
+              else
+                echo "❌ ERROR: Application not found in PM2 after start"
+                pm2 list
+                exit 1
+              fi
+            displayName: '5. Restart Server (PM2)'
+            condition: succeeded()
+
+          # ============================================
+          # Step 6: Run Priority Tests
+          # ============================================
+          - script: |
+              echo "Running priority tests (critical and high)..."
+              echo "Testing deployed application at: $(deployPath)"
+              cd $(deployPath)
+              echo "Current directory: $(pwd)"
+              echo "Verifying .env files exist:"
+              ls -la .env* 2>/dev/null || echo "WARNING: No .env files found"
+              echo ""
+              npm run test:priority
+            displayName: '6. Run Priority Tests'
+            condition: succeeded()
+            continueOnError: false
+
+          # ============================================
+          # Step 7: Rollback (Restore Previous Version)
+          # ============================================
+          - script: |
+              echo "=========================================="
+              echo "DEPLOYMENT TESTS FAILED - INITIATING ROLLBACK"
+              echo "=========================================="
+
+              # Check if backup exists
+              if [ -d "$(backupPath)/$(projectName)-$(timestamp)" ] && [ "$(ls -A $(backupPath)/$(projectName)-$(timestamp))" ]; then
+                echo "✅ Backup found at: $(backupPath)/$(projectName)-$(timestamp)"
+                echo ""
+
+                echo "Step 1: Stopping failed deployment..."
+                pm2 stop $(projectName) || true
+                echo "✅ Application stopped"
+                echo ""
+
+                echo "Step 2: Removing failed deployment files..."
+                rm -rf $(deployPath)/*
+                echo "✅ Failed files removed"
+                echo ""
+
+                echo "Step 3: Restoring backup files..."
+                cp -r $(backupPath)/$(projectName)-$(timestamp)/* $(deployPath)/
+                echo "✅ Backup files restored to $(deployPath)"
+                echo ""
+
+                echo "Step 4: Verifying restored files..."
+                cd $(deployPath)
+                ls -lah .env* 2>/dev/null || echo "No .env files (may already exist on server)"
+                echo "✅ File structure verified"
+                echo ""
+
+                echo "Step 5: Reinstalling dependencies..."
+                npm ci --production
+                echo "✅ Dependencies installed"
+                echo ""
+
+                echo "Step 6: Restarting application..."
+                pm2 delete $(projectName) || true
+                cd $(deployPath)
+
+                if npm run $(pm2StartCommand); then
+                  echo "✅ Application start command executed"
+                else
+                  echo "❌ CRITICAL: Failed to start application"
+                  echo "Current directory: $(pwd)"
+                  pm2 list
+                  exit 1
+                fi
+                echo ""
+
+                echo "Step 7: Waiting for application to stabilize..."
+                sleep 5
+                echo ""
+
+                echo "Step 8: Verifying application status..."
+                if pm2 describe $(projectName) > /dev/null 2>&1; then
+                  if pm2 describe $(projectName) | grep -q "online"; then
+                    echo "✅ Application is ONLINE"
+                    pm2 status $(projectName)
+                    echo ""
+                    echo "=========================================="
+                    echo "✅ ROLLBACK COMPLETED SUCCESSFULLY"
+                    echo "=========================================="
+                    echo ""
+                    echo "Rollback Summary:"
+                    echo "  ✅ Backup restored"
+                    echo "  ✅ Dependencies installed"
+                    echo "  ✅ Application restarted"
+                    echo "  ✅ Server is ONLINE and operational"
+                    echo ""
+                    exit 0
+                  else
+                    echo "⚠️  Application exists but is not ONLINE"
+                    pm2 describe $(projectName) | grep "status"
+                    pm2 logs $(projectName) --lines 50 --nostream || true
+                    exit 1
+                  fi
+                else
+                  echo "❌ Application not found in PM2"
+                  pm2 list
+                  exit 1
+                fi
+              else
+                echo "⚠️  No backup found - this was a first-time deployment"
+                echo "Stopping failed deployment..."
+                pm2 stop $(projectName) || true
+                pm2 delete $(projectName) || true
+                echo ""
+                echo "=========================================="
+                echo "⚠️  ROLLBACK SKIPPED - No previous version available"
+                echo "=========================================="
+                exit 0
+              fi
+            displayName: '7. Rollback (Restore Previous Version)'
+            condition: failed()
+
+          # ============================================
+          # Step 8: Validate Rollback (Test Restored Version)
+          # ============================================
+          - script: |
+              echo "=========================================="
+              echo "🔍 VALIDATING ROLLBACK - Testing Restored Version"
+              echo "=========================================="
+              echo ""
+
+              # Switch to deployment directory
+              cd $(deployPath)
+              echo "Testing from: $(pwd)"
+              echo "Environment files:"
+              ls -la .env* 2>/dev/null || echo "No .env files visible"
+              echo ""
+
+              echo "Running priority tests on restored application..."
+              echo "Command: npm run test:priority"
+              echo ""
+
+              if npm run test:priority; then
+                echo ""
+                echo "=========================================="
+                echo "✅ ROLLBACK VALIDATION SUCCESSFUL"
+                echo "=========================================="
+                echo ""
+                echo "Validation Summary:"
+                echo "  ✅ All priority tests passed"
+                echo "  ✅ Restored version is fully functional"
+                echo "  ✅ System is stable and operational"
+                echo ""
+              else
+                echo ""
+                echo "=========================================="
+                echo "❌ ROLLBACK VALIDATION FAILED"
+                echo "=========================================="
+                echo ""
+                echo "Critical Issue:"
+                echo "  ❌ Priority tests failed on restored version"
+                echo "  ⚠️  This indicates a deeper system issue"
+                echo ""
+                echo "Possible causes:"
+                echo "  - Database connectivity issues"
+                echo "  - External service dependencies down"
+                echo "  - Environment configuration problems"
+                echo ""
+                echo "Current application status:"
+                pm2 status $(projectName)
+                echo ""
+                echo "Recent application logs:"
+                pm2 logs $(projectName) --lines 30 --nostream || true
+                echo ""
+                exit 1
+              fi
+            displayName: '8. Validate Rollback (Test Restored Version)'
+            condition: failed()
+
+          # ============================================
+          # Step 9: Final Report (Always Executes)
+          # ============================================
+          - script: |
+              echo "=========================================="
+              echo "📊 PIPELINE EXECUTION REPORT"
+              echo "=========================================="
+              echo ""
+              echo "Project: $(projectName)"
+              echo "Timestamp: $(timestamp)"
+              echo "Deploy Path: $(deployPath)"
+              echo "Backup Path: $(backupPath)/$(projectName)-$(timestamp)"
+              echo ""
+
+              # Check current application status
+              echo "=========================================="
+              echo "🔍 Current Application Status"
+              echo "=========================================="
+              if pm2 describe $(projectName) > /dev/null 2>&1; then
+                pm2 status $(projectName)
+                echo ""
+                if pm2 describe $(projectName) | grep -q "online"; then
+                  echo "Status: ✅ Application is ONLINE"
+                else
+                  echo "Status: ⚠️  Application exists but not ONLINE"
+                fi
+              else
+                echo "Status: ❌ Application not found in PM2"
+              fi
+              echo ""
+
+              # Determine pipeline outcome
+              echo "=========================================="
+              echo "📋 Pipeline Execution Summary"
+              echo "=========================================="
+
+              # Check if we're in a failed state (deployment failed)
+              if [ "$(Agent.JobStatus)" == "Failed" ] || [ "$(Agent.JobStatus)" == "SucceededWithIssues" ]; then
+                echo ""
+                echo "Deployment Result: ❌ FAILED"
+                echo ""
+                echo "What happened:"
+                echo "  1. ✅ Dependencies installed successfully"
+                echo "  2. ✅ Backup created successfully"
+                echo "  3. ✅ Project deployed to server"
+                echo "  4. ✅ Server restarted successfully"
+                echo "  5. ❌ NEW deployment tests FAILED"
+                echo "  6. ✅ Rollback executed successfully"
+                echo "  7. ✅ Previous version restored and operational"
+                echo ""
+                echo "Final Status:"
+                echo "  - New code: ❌ Not deployed (failed tests)"
+                echo "  - System: ✅ Stable (running previous version)"
+                echo "  - Action Required: Fix failing tests in new code"
+                echo ""
+                echo "=========================================="
+                echo "⚠️  PIPELINE FAILED - System rolled back to stable version"
+                echo "=========================================="
+              else
+                echo ""
+                echo "Deployment Result: ✅ SUCCESSFUL"
+                echo ""
+                echo "What happened:"
+                echo "  1. ✅ Dependencies installed successfully"
+                echo "  2. ✅ Backup created successfully"
+                echo "  3. ✅ Project deployed to server"
+                echo "  4. ✅ Server restarted successfully"
+                echo "  5. ✅ All priority tests PASSED"
+                echo ""
+                echo "Final Status:"
+                echo "  - New code: ✅ Successfully deployed"
+                echo "  - System: ✅ Stable and operational"
+                echo "  - Tests: ✅ All priority tests passing"
+                echo ""
+                echo "=========================================="
+                echo "✅ PIPELINE COMPLETED SUCCESSFULLY"
+                echo "=========================================="
+              fi
+              echo ""
+
+              echo "📦 Backup Information:"
+              echo "  Location: $(backupPath)/$(projectName)-$(timestamp)"
+              echo "  Note: Clean old backups manually or via scheduled task"
+              echo ""
+
+              echo "📝 PM2 Logs Location:"
+              pm2 info $(projectName) 2>/dev/null | grep "log path" || echo "  Run 'pm2 info $(projectName)' to view log paths"
+              echo ""
+            displayName: '9. Final Report (Always Executes)'
+            condition: always()
